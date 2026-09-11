@@ -38,6 +38,7 @@ html { scroll-behavior: smooth; }
 .location-map { display:flex!important; flex-direction:column; min-height:340px; background:#fff; }
 .location-map iframe { width:100%; flex:1; min-height:300px; border:0; }
 .location-map a { font:16px/1.5 Arial,sans-serif; color:#00204e; padding:8px; text-align:center; }
+.wixui-video-player .standalone-video { display:block; width:100%; height:100%; object-fit:cover; background:#000; }
 .static-gallery figure { margin:0; min-width:0; }
 .static-gallery img { display:block; width:100%!important; height:220px!important; object-fit:cover; }
 .static-gallery figcaption { font:15px/1.5 Arial,sans-serif; padding:8px 0; color:#222; }

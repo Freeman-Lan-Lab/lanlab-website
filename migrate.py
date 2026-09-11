@@ -117,6 +117,12 @@ for route,s in pages.items():
             if poster:
                 video['poster'] = poster['src']
                 poster.decompose()
+    for video in s.select('video[src]'):
+        if video['src'].startswith(('https://','//')):
+            video['src'] = prefix+register(video['src'])
+        poster = video.get('poster','')
+        if poster.startswith(('https://','//')):
+            video['poster'] = prefix+register(poster, original=True)
     for a in s.select('a[href]'):
         a['href'] = local_link(a['href'],prefix)
         if a.get('target') == '_blank': a['rel'] = 'noopener noreferrer'
@@ -141,6 +147,9 @@ for route,s in pages.items():
                     for child in fresh.select('[id]'): del child['id']
                     block.append(fresh)
                 elif el.name=='video':
+                    key = 'video:' + el.get('src','')
+                    if key in seen: continue
+                    seen.add(key)
                     fresh = BeautifulSoup(str(el),'html.parser').find()
                     fresh.attrs.pop('id',None)
                     fresh.attrs.pop('class',None)
@@ -193,7 +202,7 @@ for route,s in pages.items():
         control.decompose()
     s.html['lang']='en'
     skip=s.new_tag('a',href='#PAGES_CONTAINER',attrs={'class':'skip-link'});skip.string='Skip to main content';s.body.insert(0,skip)
-    style = s.new_tag('link',rel='stylesheet',href=prefix+'migration.css?v=9')
+    style = s.new_tag('link',rel='stylesheet',href=prefix+'migration.css?v=10')
     s.head.append(style)
     script=s.new_tag('script',src=prefix+'site.js?v=9',defer='');s.head.append(script)
     dest = OUT / route.strip('/')

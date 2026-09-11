@@ -28,11 +28,33 @@ def gallery(s, host, items, mode='carousel', label='Photo gallery'):
 
 def prepare(s,model,route):
     props=model.get('props',{}).get('render',{}).get('compProps',{})
+    components=model.get('structure',{}).get('components',{})
     for cid,prop in props.items():
         if not isinstance(prop,dict): continue
+        host=s.find(id=cid)
+        if host and components.get(cid,{}).get('componentType')=='VideoPlayer' and prop.get('src'):
+            host.clear()
+            video=s.new_tag('video',attrs={
+                'class':'standalone-video',
+                'src':prop['src'],
+                'controls':'',
+                'playsinline':'',
+                'preload':'metadata',
+            })
+            description=prop.get('playableConfig',{}).get('description','').strip()
+            video['aria-label']=description or prop.get('title') or 'Lab research video'
+            poster=prop.get('playableConfig',{}).get('poster',{}).get('uri')
+            if poster:
+                video['poster']='https://static.wixstatic.com/media/'+poster
+            if prop.get('autoplay'):
+                video['autoplay']=''
+            if prop.get('muted'):
+                video['muted']=''
+            if prop.get('loop'):
+                video['loop']=''
+            host.append(video)
         items=prop.get('items',[])
         photos=[{'src':'https://static.wixstatic.com/media/'+v['image']['uri'],'title':v.get('title',''),'description':v.get('description','')} for v in items if isinstance(v,dict) and v.get('image',{}).get('uri')]
-        host=s.find(id=cid)
         if host and photos: gallery(s,host,photos,'events-grid' if route=='/events' else 'carousel')
         slides=prop.get('slidesProps',[])
         if host and slides:
@@ -50,7 +72,7 @@ def prepare(s,model,route):
         if height:
             host['style']='height:'+height[1]
             host.parent['style']='width:100%;height:'+height[1]+';margin:0'
-    for cid,comp in model.get('structure',{}).get('components',{}).items():
+    for cid,comp in components.items():
         if comp.get('componentType')!='GoogleMap': continue
         host=s.find(id=cid)
         if host:
