@@ -29,6 +29,11 @@ def gallery(s, host, items, mode='carousel', label='Photo gallery'):
 def prepare(s,model,route):
     props=model.get('props',{}).get('render',{}).get('compProps',{})
     components=model.get('structure',{}).get('components',{})
+    if route=='/':
+        news=s.find(id='comp-mho3qn5e')
+        if news:
+            for text in news.find_all(string=lambda value: value and 'Ryu joins our lab as a new graduate student!' in value):
+                text.replace_with('Ryu Kawajiri and Kenny Man join us as new graduate students!')
     for cid,prop in props.items():
         if not isinstance(prop,dict): continue
         host=s.find(id=cid)
