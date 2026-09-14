@@ -60,7 +60,7 @@ def css_urls(text):
     text = re.sub(r'url\([\'"]?media/emptystate[^)]+\)', 'none', text)
     return re.sub(r'url\([\'"]?((?:https:)?//[^)\s\'"]+)[\'"]?\)', lambda m:'url("'+register(m[1])+'")', text)
 
-nav_items = [('Home','/'),('Microfluidics','/microfluidics'),('Microbiome','/microbiome'),('Publications','/publications'),('The PI','/the-pi'),('Team','/team'),('Events','/events'),('Contact','/join-us')]
+nav_items = [('Home','/'),('Microfluidics','/microfluidics'),('Microbiome','/microbiome'),('Publications','/publications'),('The PI','/the-pi'),('Team','/team'),('Events','/events'),('Join Us','/join-us')]
 def local_link(href, prefix):
     full = urljoin(BASE, href)
     p = urlsplit(full)
@@ -102,7 +102,10 @@ for route,s in pages.items():
         }
         img['src'] = prefix+register(img['src'], original=not preserve_crop)
         img.attrs.pop('srcset', None)
-        img['loading'] = 'lazy'
+        # These image-led pages depend on the illustrations and portraits as part
+        # of the reading flow.  Load them immediately so mobile browsers do not
+        # leave empty placeholders after a rapid scroll or anchor jump.
+        img['loading'] = 'eager' if route in ('/', '/microbiome', '/team') else 'lazy'
         img['decoding'] = 'async'
     for container in s.select('[data-video-info]'):
         info = json.loads(container['data-video-info'])
@@ -126,50 +129,13 @@ for route,s in pages.items():
     for a in s.select('a[href]'):
         a['href'] = local_link(a['href'],prefix)
         if a.get('target') == '_blank': a['rel'] = 'noopener noreferrer'
-    # Keep the original desktop artwork and layout. Supply a semantic mobile reading view.
+    page_name = route.strip('/').replace('/','-') or 'home'
+    s.body['class'] = s.body.get('class',[]) + ['responsive-site', 'page-'+page_name]
+    # The original page is now the single content tree at every viewport width.
+    # Responsive CSS reflows these same components instead of cloning their text.
     main = s.select_one('main')
-    mobile = s.new_tag('main', attrs={'class':'mobile-content', 'id':'mobile-content', 'tabindex':'-1'})
     if main:
-        main['class'] = main.get('class',[])+['desktop-content']
-        seen = set()
-        for section in main.select('section') or [main]:
-            block = s.new_tag('section', attrs={'class':'mobile-section'})
-            for el in section.select('.wixui-rich-text, .static-gallery, .location-map, img, video, a[href]'):
-                if el.find_parent(class_='wixui-rich-text'): continue
-                if el.find_parent(class_='static-gallery') or el.find_parent(class_='location-map'): continue
-                if el.name=='a' and (el.select_one('img') or el.select_one('.wixui-rich-text')): continue
-                if 'static-gallery' in el.get('class',[]) or 'location-map' in el.get('class',[]):
-                    component_key = 'component:' + el.get('id','')
-                    if component_key in seen: continue
-                    seen.add(component_key)
-                    fresh = BeautifulSoup(str(el),'html.parser').find()
-                    fresh.attrs = {k:v for k,v in el.attrs.items() if k in ('class','data-gallery','data-autoplay','aria-label')}
-                    for child in fresh.select('[id]'): del child['id']
-                    block.append(fresh)
-                elif el.name=='video':
-                    key = 'video:' + el.get('src','')
-                    if key in seen: continue
-                    seen.add(key)
-                    fresh = BeautifulSoup(str(el),'html.parser').find()
-                    fresh.attrs.pop('id',None)
-                    fresh.attrs.pop('class',None)
-                    block.append(fresh)
-                elif el.name=='img':
-                    key = el.get('src')
-                    if key in seen: continue
-                    seen.add(key)
-                    fresh = s.new_tag('img', src=key, alt=el.get('alt',''), loading='lazy')
-                    block.append(fresh)
-                else:
-                    key = el.get_text(' ',strip=True).replace('\u200b','').strip()
-                    if not key or key in seen: continue
-                    seen.add(key)
-                    clone = BeautifulSoup(str(el),'html.parser').find()
-                    for child in [clone]+list(clone.find_all(True)):
-                        child.attrs = {k:v for k,v in child.attrs.items() if k in ('href','target','rel')}
-                    block.append(clone)
-            if block.contents: mobile.append(block)
-        main.insert_after(mobile)
+        main['class'] = main.get('class',[])+['responsive-content']
     header = s.select_one('header')
     if header:
         original_logo = header.select_one('img')
@@ -181,7 +147,13 @@ for route,s in pages.items():
             logo.append(s.new_tag('img',src=logo_src,alt='Lan Lab'))
         else: logo.string = 'LAN LAB'
         header.append(logo)
-        nav = s.new_tag('nav',attrs={'aria-label':'Main navigation'})
+        wordmark=s.new_tag('span',attrs={'class':'university-wordmark','aria-label':'University of Toronto'})
+        wordmark.string='UNIVERSITY OF\nTORONTO'
+        header.append(wordmark)
+        menu=s.new_tag('button',type='button',attrs={'class':'mobile-menu-toggle','aria-expanded':'false','aria-controls':'site-navigation','aria-label':'Open navigation menu'})
+        menu.string='☰'
+        header.append(menu)
+        nav = s.new_tag('nav',attrs={'id':'site-navigation','aria-label':'Main navigation'})
         for label,path in nav_items:
             if path not in pages or path=='/microbiome': continue
             if path=='/microfluidics':
@@ -202,9 +174,9 @@ for route,s in pages.items():
         control.decompose()
     s.html['lang']='en'
     skip=s.new_tag('a',href='#PAGES_CONTAINER',attrs={'class':'skip-link'});skip.string='Skip to main content';s.body.insert(0,skip)
-    style = s.new_tag('link',rel='stylesheet',href=prefix+'migration.css?v=10')
+    style = s.new_tag('link',rel='stylesheet',href=prefix+'migration.css?v=25')
     s.head.append(style)
-    script=s.new_tag('script',src=prefix+'site.js?v=9',defer='');s.head.append(script)
+    script=s.new_tag('script',src=prefix+'site.js?v=13',defer='');s.head.append(script)
     dest = OUT / route.strip('/')
     dest.mkdir(exist_ok=True,parents=True)
     (dest/'index.html').write_text(str(s),encoding='utf-8')
@@ -245,3 +217,4 @@ except ImportError:
     print('Pillow unavailable; keeping original-size photos.')
 (ROOT/'migration-report.json').write_text(json.dumps({'pages':list(pages),'assets':assets,'failures':failures},indent=2),encoding='utf-8')
 print('Complete:',len(pages),'pages;',len(assets),'assets;',len(failures),'failures')
+

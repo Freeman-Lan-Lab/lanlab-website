@@ -1,9 +1,21 @@
 // Accessible standalone navigation and galleries. No Wix runtime required.
+const menuToggle = document.querySelector('.mobile-menu-toggle');
+const siteNav = document.querySelector('#site-navigation');
+if (menuToggle && siteNav) {
+  menuToggle.addEventListener('click', () => {
+    const open = menuToggle.getAttribute('aria-expanded') === 'true';
+    menuToggle.setAttribute('aria-expanded', String(!open));
+    menuToggle.setAttribute('aria-label', open ? 'Open navigation menu' : 'Close navigation menu');
+    siteNav.toggleAttribute('data-open', !open);
+  });
+}
 document.querySelectorAll('[data-gallery]').forEach(gallery => {
   const figures = [...gallery.querySelectorAll(':scope > figure')];
   if (!figures.length) return;
   let current = 0;
-  if (gallery.classList.contains('photo-strip')) {
+  if (gallery.classList.contains('team-join-collage')) {
+    return;
+  } else if (gallery.classList.contains('photo-strip')) {
     const track=document.createElement('div');track.className='photo-track';track.tabIndex=0;
     track.setAttribute('aria-label','Lab photographs; scroll horizontally for more');
     figures.forEach(f=>track.append(f));gallery.append(track);
@@ -28,15 +40,15 @@ document.querySelectorAll('[data-gallery]').forEach(gallery => {
     counter.setAttribute('aria-live','polite');
     const render = () => { figures.forEach((f,i) => f.hidden = i !== current); counter.textContent = `${current + 1} / ${figures.length}`; };
     let timer;
-    const stop = () => { clearInterval(timer); if (pause) pause.textContent='Play slideshow'; };
+    const stop = () => { clearInterval(timer); if (pause) { pause.textContent='▶'; pause.setAttribute('aria-label','Play slideshow'); } };
     const step = n => { current=(current+n+figures.length)%figures.length; render(); };
     prev.addEventListener('click',()=>{stop();step(-1)}); next.addEventListener('click',()=>{stop();step(1)});
     controls.append(prev,counter,next);gallery.append(controls);
     let pause;
     if(gallery.dataset.autoplay && !matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      pause=document.createElement('button');pause.type='button';pause.textContent='Pause slideshow';
-      const start=()=>{timer=setInterval(()=>{if(!document.hidden && gallery.getClientRects().length)step(1)},4000);pause.textContent='Pause slideshow'};
-      pause.addEventListener('click',()=>pause.textContent.startsWith('Pause')?stop():start());controls.append(pause);start();
+      pause=document.createElement('button');pause.type='button';pause.className='slideshow-toggle';pause.textContent='⏸';pause.setAttribute('aria-label','Pause slideshow');
+      const start=()=>{timer=setInterval(()=>{if(!document.hidden && gallery.getClientRects().length)step(1)},4000);pause.textContent='⏸';pause.setAttribute('aria-label','Pause slideshow')};
+      pause.addEventListener('click',()=>pause.getAttribute('aria-label').startsWith('Pause')?stop():start());controls.append(pause);start();
       gallery.addEventListener('focusin',stop);gallery.addEventListener('pointerenter',stop);
     }
     render();
@@ -52,6 +64,58 @@ document.querySelectorAll('.enlarge').forEach(button=>button.addEventListener('c
  const img=button.querySelector('img');image.src=img.src;image.alt=img.alt;dialog.showModal();
 }));
 document.querySelectorAll('.skip-link').forEach(link=>link.addEventListener('click',e=>{
- e.preventDefault();const main=matchMedia('(max-width: 980px)').matches?document.querySelector('.mobile-content'):document.querySelector('.desktop-content');
- main.focus();main.scrollIntoView();
+ e.preventDefault();const main=document.querySelector('.responsive-content');
+ if(main){main.tabIndex=-1;main.focus();main.scrollIntoView();}
 }));
+
+// Keep older news available without making the phone homepage excessively long.
+const mobileLayout = matchMedia('(max-width: 980px)');
+function syncMobileDisclosure() {
+  document.querySelectorAll('.news-toggle,.alumni-toggle').forEach(button=>button.remove());
+  document.querySelectorAll('.news-year-list,.alumni-detail').forEach(part=>part.hidden=false);
+  if (!mobileLayout.matches) return;
+  document.querySelectorAll('#comp-mho3qn5e .news-year[data-year="2025"],#comp-mho3qn5e .news-year[data-year="2024"]').forEach(heading => {
+    const list=document.querySelector(`#comp-mho3qn5e .news-year-list[data-year="${heading.dataset.year}"]`);
+    if(!list) return;
+    const button=document.createElement('button');button.type='button';button.className='news-toggle';button.textContent=`Show ${heading.dataset.year} news`;button.setAttribute('aria-expanded','false');
+    list.hidden=true;heading.insertAdjacentElement('afterend',button);
+    button.addEventListener('click',()=>{const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));button.textContent=`${open?'Show':'Hide'} ${heading.dataset.year} news`;list.hidden=open;});
+  });
+  const alumniParts=['comp-mj1qnih9','comp-mj1qnihb','comp-mj1qniin','comp-mj1qniik1','comp-mj1qnijj','comp-mtw9m99r','comp-mphcly2u'].map(id=>document.getElementById(id)).filter(Boolean);
+  const alumniHeading=document.getElementById('comp-mj1qnih6');
+  if(alumniParts.length && alumniHeading){
+    alumniParts.forEach(part=>{part.classList.add('alumni-detail');part.hidden=true});
+    const button=document.createElement('button');button.type='button';button.className='alumni-toggle';button.textContent='Show alumni';button.setAttribute('aria-expanded','false');
+    alumniHeading.insertAdjacentElement('afterend',button);
+    button.addEventListener('click',()=>{const open=button.getAttribute('aria-expanded')==='true';button.setAttribute('aria-expanded',String(!open));button.textContent=open?'Show alumni':'Hide alumni';alumniParts.forEach(part=>part.hidden=open);});
+  }
+}
+
+syncMobileDisclosure();
+mobileLayout.addEventListener('change', syncMobileDisclosure);
+
+// Reuse the original identity paragraph and restore its place on desktop.
+const piBiography = document.getElementById('comp-mhql58m2');
+if (piBiography) {
+ const identity = piBiography.querySelector(':scope > p');
+ const marker = document.createComment('PI identity original position');
+ identity.before(marker);
+ const slot = document.createElement('div'); slot.className='pi-mobile-identity';
+ const sync = () => {
+  if (mobileLayout.matches) { piBiography.parentElement.append(slot); slot.append(identity); }
+  else { marker.after(identity); slot.remove(); }
+ };
+ sync(); mobileLayout.addEventListener('change',sync);
+}
+const profileIds=['comp-m3emvxd01','comp-luioupgi','comp-lxhwwdqr','comp-m65a7vbx','comp-mn8xq2fn','comp-mmus012g','comp-m659yg6s3','comp-mhvhiy0o'];
+profileIds.forEach(id=>{
+ const paragraph=document.querySelector('#'+id+' .wixui-rich-text p');
+ if(!paragraph)return;
+ const walker=document.createTreeWalker(paragraph,NodeFilter.SHOW_TEXT);
+ while(walker.nextNode()){
+  const node=walker.currentNode;
+  if(node.textContent.trim()) { const label=document.createElement('span');label.className='profile-name';node.replaceWith(label);label.append(node);break; }
+ }
+});
+
+document.querySelectorAll('#comp-loz3zzza1 > p').forEach(p=>{if(/^\d{4}$/.test(p.textContent.trim()))p.classList.add('publication-year');});
